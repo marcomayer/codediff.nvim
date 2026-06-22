@@ -3,6 +3,7 @@
 
 local render = require("codediff.ui")
 local view = require("codediff.ui.view")
+local view_render = require("codediff.ui.view.render")
 local diff = require('codediff.core.diff')
 local lifecycle = require("codediff.ui.lifecycle")
 
@@ -200,5 +201,54 @@ describe("Auto-scroll to first hunk", function()
     -- Cleanup
     vim.fn.delete(left_path)
     vim.fn.delete(right_path)
+  end)
+
+  it("Restores pane-specific cursors after anchoring past top fillers", function()
+    local original = {}
+    local modified = {}
+    for i = 1, 40 do
+      original[i] = "line " .. i
+      modified[i] = "line " .. i
+    end
+
+    local original_buf = vim.api.nvim_create_buf(false, true)
+    local modified_buf = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_buf_set_lines(original_buf, 0, -1, false, original)
+    vim.api.nvim_buf_set_lines(modified_buf, 0, -1, false, modified)
+
+    vim.cmd("tabnew")
+    local original_win = vim.api.nvim_get_current_win()
+    vim.api.nvim_win_set_buf(original_win, original_buf)
+    vim.cmd("rightbelow vsplit")
+    local modified_win = vim.api.nvim_get_current_win()
+    vim.api.nvim_win_set_buf(modified_win, modified_buf)
+
+    local lines_diff = {
+      changes = {
+        {
+          original = { start_line = 1, end_line = 1 },
+          modified = { start_line = 1, end_line = 3 },
+        },
+        {
+          original = { start_line = 20, end_line = 21 },
+          modified = { start_line = 22, end_line = 23 },
+        },
+      },
+    }
+
+    view_render.establish_scrollbind(
+      original_win,
+      modified_win,
+      original_buf,
+      modified_buf,
+      lines_diff,
+      { 20, 0 },
+      { 22, 0 }
+    )
+
+    assert.same({ 20, 0 }, vim.api.nvim_win_get_cursor(original_win))
+    assert.same({ 22, 0 }, vim.api.nvim_win_get_cursor(modified_win))
+    assert.is_true(vim.wo[original_win].scrollbind)
+    assert.is_true(vim.wo[modified_win].scrollbind)
   end)
 end)

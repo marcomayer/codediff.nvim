@@ -200,25 +200,24 @@ local function resume_diff(tabpage)
       local result_win = diff.result_win and vim.api.nvim_win_is_valid(diff.result_win) and diff.result_win or nil
 
       if current_win == diff.original_win or current_win == diff.modified_win or current_win == result_win then
-        -- Step 1: Remember cursor position (line AND column)
-        local saved_cursor = vim.api.nvim_win_get_cursor(current_win)
+        local original_cursor = vim.api.nvim_win_get_cursor(diff.original_win)
+        local modified_cursor = vim.api.nvim_win_get_cursor(diff.modified_win)
+        local result_cursor = result_win and vim.api.nvim_win_get_cursor(result_win) or nil
 
-        -- Step 2: Reset all to line 1 (baseline)
-        vim.api.nvim_win_set_cursor(diff.original_win, { 1, 0 })
-        vim.api.nvim_win_set_cursor(diff.modified_win, { 1, 0 })
-        if result_win then
-          vim.api.nvim_win_set_cursor(result_win, { 1, 0 })
-        end
-
-        -- Step 3: Re-establish scrollbind (reset sync state)
-        vim.wo[diff.original_win].scrollbind = false
-        vim.wo[diff.modified_win].scrollbind = false
+        -- Re-establish scrollbind with the same filler-aware anchor path used
+        -- by initial render.
+        local view_render = require("codediff.ui.view.render")
+        view_render.establish_scrollbind(
+          diff.original_win,
+          diff.modified_win,
+          diff.original_bufnr,
+          diff.modified_bufnr,
+          lines_diff,
+          original_cursor,
+          modified_cursor
+        )
         if result_win then
           vim.wo[result_win].scrollbind = false
-        end
-        vim.wo[diff.original_win].scrollbind = true
-        vim.wo[diff.modified_win].scrollbind = true
-        if result_win then
           vim.wo[result_win].scrollbind = true
         end
 
@@ -227,13 +226,9 @@ local function resume_diff(tabpage)
         vim.wo[diff.modified_win].wrap = false
         if result_win then
           vim.wo[result_win].wrap = false
-        end
-
-        -- Step 4: Restore cursor position with both line and column
-        pcall(vim.api.nvim_win_set_cursor, diff.original_win, saved_cursor)
-        pcall(vim.api.nvim_win_set_cursor, diff.modified_win, saved_cursor)
-        if result_win then
-          pcall(vim.api.nvim_win_set_cursor, result_win, saved_cursor)
+          if result_cursor then
+            pcall(vim.api.nvim_win_set_cursor, result_win, result_cursor)
+          end
         end
       end
     end

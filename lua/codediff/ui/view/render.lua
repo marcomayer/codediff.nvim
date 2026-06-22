@@ -36,6 +36,12 @@ function M.establish_scrollbind(orig_win, mod_win, orig_buf, mod_buf, lines_diff
       vim.wo[orig_win].scrollbind = true
       vim.wo[mod_win].scrollbind = true
       vim.cmd("syncbind")
+      if orig_cursor then
+        pcall(vim.api.nvim_win_set_cursor, orig_win, orig_cursor)
+      end
+      if mod_cursor then
+        pcall(vim.api.nvim_win_set_cursor, mod_win, mod_cursor)
+      end
       return
     end
   end
