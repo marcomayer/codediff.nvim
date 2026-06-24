@@ -480,6 +480,69 @@ describe("compact mode (#344)", function()
   -- reapply with empty changes (new/untracked file switch)
   -- =====================================================================
 
+  describe("reapply refreshes stale closed folds", function()
+    local function line_change(lnum)
+      return {
+        original = { start_line = lnum, end_line = lnum + 1 },
+        modified = { start_line = lnum, end_line = lnum + 1 },
+      }
+    end
+
+    it("opens a newly visible line that was folded in the previous side-by-side file", function()
+      local original, modified = {}, {}
+      for i = 1, 30 do
+        original[i] = "line " .. i
+        modified[i] = "line " .. i
+      end
+      modified[20] = "line 20 CHANGED"
+
+      local tabpage, session = create_session(original, modified)
+      assert.is_true(compact.enable(tabpage))
+
+      local before = vim.api.nvim_win_call(session.modified_win, function()
+        return vim.fn.foldclosed(2)
+      end)
+      assert.is_true(before > 0, "line 2 should start inside the previous closed fold")
+
+      session.stored_diff_result = { changes = { line_change(2) }, moves = {} }
+      compact.reapply(tabpage)
+
+      local after = vim.api.nvim_win_call(session.modified_win, function()
+        return vim.fn.foldclosed(2)
+      end)
+      assert.equal(-1, after, "line 2 should be open after reapply recomputes folds")
+    end)
+
+    it("opens a newly visible line that was folded in the previous inline file", function()
+      require("codediff").setup({
+        diff = { layout = "inline", compact_context_lines = 3 },
+      })
+
+      local original, modified = {}, {}
+      for i = 1, 30 do
+        original[i] = "line " .. i
+        modified[i] = "line " .. i
+      end
+      modified[20] = "line 20 CHANGED"
+
+      local tabpage, session = create_session(original, modified)
+      assert.is_true(compact.enable(tabpage))
+
+      local before = vim.api.nvim_win_call(session.modified_win, function()
+        return vim.fn.foldclosed(2)
+      end)
+      assert.is_true(before > 0, "line 2 should start inside the previous closed fold")
+
+      session.stored_diff_result = { changes = { line_change(2) }, moves = {} }
+      compact.reapply(tabpage)
+
+      local after = vim.api.nvim_win_call(session.modified_win, function()
+        return vim.fn.foldclosed(2)
+      end)
+      assert.equal(-1, after, "line 2 should be open after reapply recomputes inline folds")
+    end)
+  end)
+
   describe("reapply with empty changes", function()
     it("clears stale fold data so foldexpr returns '0' for all lines (side-by-side)", function()
       local original, modified = {}, {}

@@ -12,6 +12,18 @@ local visible_lines_by_win = {}
 -- bounce back. Set true while a sync is in flight.
 local _syncing = false
 
+local function refresh_window_folds(win)
+  if not win or not vim.api.nvim_win_is_valid(win) then
+    return
+  end
+
+  vim.api.nvim_win_call(win, function()
+    local view = vim.fn.winsaveview()
+    pcall(vim.cmd, "normal! zX")
+    pcall(vim.fn.winrestview, view)
+  end)
+end
+
 --- Called by Neovim for each line when foldmethod=expr
 --- @return string fold level: "0" for visible lines, "1" for foldable
 function M.foldexpr_eval()
@@ -316,10 +328,19 @@ function M.reapply(tabpage)
   local changes = session.stored_diff_result.changes
   if not changes or #changes == 0 then
     if session.layout == "inline" then
-      if session.modified_win then visible_lines_by_win[session.modified_win] = nil end
+      if session.modified_win then
+        visible_lines_by_win[session.modified_win] = nil
+        refresh_window_folds(session.modified_win)
+      end
     else
-      if session.original_win then visible_lines_by_win[session.original_win] = nil end
-      if session.modified_win then visible_lines_by_win[session.modified_win] = nil end
+      if session.original_win then
+        visible_lines_by_win[session.original_win] = nil
+        refresh_window_folds(session.original_win)
+      end
+      if session.modified_win then
+        visible_lines_by_win[session.modified_win] = nil
+        refresh_window_folds(session.modified_win)
+      end
     end
     return
   end
@@ -344,6 +365,7 @@ function M.reapply(tabpage)
       vim.wo[entry.win].foldenable = true
       vim.wo[entry.win].foldlevel = 0
       vim.wo[entry.win].foldminlines = 1
+      refresh_window_folds(entry.win)
     end
   end
 
