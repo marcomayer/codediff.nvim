@@ -89,8 +89,17 @@ end
 
 -- Create flat file nodes (list mode)
 function M.create_file_nodes(files, git_root, group)
+  -- Order by full path so files group by folder/name. Git already returns
+  -- tracked files in this order, but untracked files arrive as a separate
+  -- appended block; sorting a copy folds them into place without mutating
+  -- the caller's list.
+  local sorted = vim.list_slice(files)
+  table.sort(sorted, function(a, b)
+    return a.path < b.path
+  end)
+
   local nodes = {}
-  for _, file in ipairs(files) do
+  for _, file in ipairs(sorted) do
     local icon, icon_color = M.get_file_icon(file.path)
     local status_info = STATUS_SYMBOLS[file.status] or { symbol = file.status, color = "Normal" }
 
